@@ -99,10 +99,27 @@ time_table_create = ("""CREATE TABLE time(
 # STAGING TABLES
 # Extract + Transform
 staging_events_copy = ("""
-""").format()
+copy staging_events from {}
+credentials 'aws_iam_role={}'
+region 'us-west-2' 
+FORMAT AS JSON {}
+COMPUPDATE OFF STATUPDATE OFF
+BLANKSASNULL EMPTYASNULL;
+""").format(config.get('S3', 'LOG_DATA'),
+            config.get('IAM_ROLE', 'ARN'),
+            config.get('S3', 'LOG_JSONPATH'))
 
 staging_songs_copy = ("""
-""").format()
+copy staging_songs
+from {}
+credentials 'aws_iam_role={}'
+region 'us-west-2'
+FORMAT AS JSON 'auto'
+COMPUPDATE OFF STATUPDATE OFF
+BLANKSASNULL EMPTYASNULL;
+
+""").format(config.get('S3', 'SONG_DATA'),
+            config.get('IAM_ROLE', 'ARN'))
 
 # FINAL TABLES
 # Load
