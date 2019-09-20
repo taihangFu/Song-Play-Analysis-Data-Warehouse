@@ -101,7 +101,7 @@ time_table_create = ("""CREATE TABLE time(
 staging_events_copy = ("""
 copy staging_events from {}
 credentials 'aws_iam_role={}'
-region 'us-west-2' 
+region '' #TODO: update region
 FORMAT AS JSON {}
 COMPUPDATE OFF STATUPDATE OFF
 BLANKSASNULL EMPTYASNULL;
@@ -113,7 +113,7 @@ staging_songs_copy = ("""
 copy staging_songs
 from {}
 credentials 'aws_iam_role={}'
-region 'us-west-2'
+region '' #TODO: update region
 FORMAT AS JSON 'auto'
 COMPUPDATE OFF STATUPDATE OFF
 BLANKSASNULL EMPTYASNULL;
