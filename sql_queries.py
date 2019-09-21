@@ -103,7 +103,7 @@ copy staging_events from {}
 credentials 'aws_iam_role={}'
 region '' #TODO: update region
 FORMAT AS JSON {}
-COMPUPDATE OFF STATUPDATE OFF
+COMPUPDATE OFF STATUPDATE OFF #TODO: add timestamp
 BLANKSASNULL EMPTYASNULL;
 """).format(config.get('S3', 'LOG_DATA'),
             config.get('IAM_ROLE', 'ARN'),
@@ -124,18 +124,93 @@ BLANKSASNULL EMPTYASNULL;
 # FINAL TABLES
 # Load
 songplay_table_insert = ("""
+INSERT INTO songplays (
+songplay_id,
+    start_time,
+    user_id,
+    level,
+    song_id,
+    artist_id,
+    session_id,
+    location,
+    user_agent)
+    SELECT DISTINCT , #TODO
+            se.userId                   AS user_id,
+            se.level                    AS level,
+            ss.song_id                  AS song_id,
+            ss.artist_id                AS artist_id,
+            se.sessionId                AS session_id,
+            se.location                 AS location,
+            se.userAgent                AS user_agent
+    FROM staging_events AS se
+    JOIN staging_songs AS ss
+        ON (se.artist = ss.artist_name)
+    WHERE se.page = 'NextSong';
+
 """)
 
 user_table_insert = ("""
+    INSERT INTO users (                 user_id,
+                                        first_name,
+                                        last_name,
+                                        gender,
+                                        level)
+    SELECT  DISTINCT se.userId          AS user_id,
+            se.firstName                AS first_name,
+            se.lastName                 AS last_name,
+            se.gender                   AS gender,
+            se.level                    AS level
+    FROM staging_events AS se
+    WHERE se.userid IS NOT NULL AND se.page = 'NextSong';
 """)
 
 song_table_insert = ("""
+    INSERT INTO songs (                 song_id,
+                                        title,
+                                        artist_id,
+                                        year,
+                                        duration)
+    SELECT  DISTINCT ss.song_id         AS song_id,
+            ss.title                    AS title,
+            ss.artist_id                AS artist_id,
+            ss.year                     AS year,
+            ss.duration                 AS duration
+    FROM staging_songs AS ss;
+    WHERE ss.song_id IS NOT NULL;
 """)
 
 artist_table_insert = ("""
+    INSERT INTO artists (               artist_id,
+                                        name,
+                                        location,
+                                        latitude,
+                                        longitude)
+    SELECT  DISTINCT ss.artist_id       AS artist_id,
+            ss.artist_name              AS name,
+            ss.artist_location          AS location,
+            ss.artist_latitude          AS latitude,
+            ss.artist_longitude         AS longitude
+    FROM staging_songs AS ss
+    WHERE ss.artist_id IS NOT NULL;
 """)
 
 time_table_insert = ("""
+INSERT INTO time (                  start_time,
+                                        hour,
+                                        day,
+                                        week,
+                                        month,
+                                        year,
+                                        weekday)
+    SELECT  DISTINCT         AS start_time, #TODO
+            EXTRACT(hour FROM start_time)    AS hour,
+            EXTRACT(day FROM start_time)     AS day,
+            EXTRACT(week FROM start_time)    AS week,
+            EXTRACT(month FROM start_time)   AS month,
+            EXTRACT(year FROM start_time)    AS year,
+            EXTRACT(week FROM start_time)    AS weekday
+    FROM    staging_events                   AS se
+    WHERE se.ts IS NOT NULL AND se.page = 'NextSong';
 """)
 
 # QUERY LISTS
