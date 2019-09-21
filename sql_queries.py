@@ -103,7 +103,8 @@ copy staging_events from {}
 credentials 'aws_iam_role={}'
 region '' #TODO: update region
 FORMAT AS JSON {}
-COMPUPDATE OFF STATUPDATE OFF #TODO: add timestamp
+COMPUPDATE OFF STATUPDATE OFF
+TIMEFORMAT as 'epochmillisecs'
 BLANKSASNULL EMPTYASNULL;
 """).format(config.get('S3', 'LOG_DATA'),
             config.get('IAM_ROLE', 'ARN'),
@@ -123,6 +124,7 @@ BLANKSASNULL EMPTYASNULL;
 
 # FINAL TABLES
 # Load
+## to_timestamp('timestamp','format') in redshift takes string inputs thus need uses to_char()
 songplay_table_insert = ("""
 INSERT INTO songplays (
 songplay_id,
@@ -134,7 +136,7 @@ songplay_id,
     session_id,
     location,
     user_agent)
-    SELECT DISTINCT , #TODO
+     SELECT DISTINCT to_timestamp(to_char(e.ts, '9999-99-99 99:99:99'),'YYYY-MM-DD HH24:MI:SS')
             se.userId                   AS user_id,
             se.level                    AS level,
             ss.song_id                  AS song_id,
@@ -202,7 +204,7 @@ INSERT INTO time (                  start_time,
                                         month,
                                         year,
                                         weekday)
-    SELECT  DISTINCT         AS start_time, #TODO
+    SELECT DISTINCT ts,
             EXTRACT(hour FROM start_time)    AS hour,
             EXTRACT(day FROM start_time)     AS day,
             EXTRACT(week FROM start_time)    AS week,
