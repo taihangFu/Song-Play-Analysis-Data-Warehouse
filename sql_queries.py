@@ -16,14 +16,14 @@ artist_table_drop = "DROP TABLE IF EXISTS artists"
 time_table_drop = "DROP TABLE IF EXISTS time"
 
 # CREATE TABLES
-
+## Redshift has default VARCHAR length of 256 bytes(ASCII) if not specified
 staging_events_table_create= ("""CREATE TABLE IF NOT EXISTS staging_events
-                                (artist VARCHAR(70),
+                                (artist VARCHAR,
                                 auth VARCHAR,
-                                firstName VARCHAR(35),
-                                gender VARCHAR(2),
+                                firstName VARCHAR,
+                                gender VARCHAR,
                                 itemInSession INT,
-                                lastName VARCHAR(35),
+                                lastName VARCHAR,
                                 length DOUBLE PRECISION,
                                 level VARCHAR,
                                 location VARCHAR,
@@ -35,13 +35,13 @@ staging_events_table_create= ("""CREATE TABLE IF NOT EXISTS staging_events
                                 status INT,
                                 ts TIMESTAMP,
                                 userAgent VARCHAR,
-                                userId VARCHAR);""")
+                                userId BIGINT);""")
 
 staging_songs_table_create = ("""CREATE TABLE IF NOT EXISTS staging_songs
                                 (song_id VARCHAR,
                                 num_songs INT,
                                 title VARCHAR,
-                                artist_name VARCHAR(70),
+                                artist_name VARCHAR,
                                 artist_latitude DOUBLE PRECISION,
                                 year INT,
                                 duration DOUBLE PRECISION,
@@ -64,9 +64,9 @@ songplay_table_create = ( """CREATE TABLE songplays(
 
 user_table_create = ("""CREATE TABLE users(
     user_id VARCHAR PRIMARY KEY,
-    first_name VARCHAR(35),
-    last_name VARCHAR(35),
-    gender VARCHAR(2),
+    first_name VARCHAR,
+    last_name VARCHAR,
+    gender VARCHAR,
     level VARCHAR)
 """)
 
@@ -80,7 +80,7 @@ song_table_create = song_table_create = ("""CREATE TABLE songs(
 
 artist_table_create = ("""CREATE TABLE artists(
     artist_id VARCHAR PRIMARY KEY,
-    name VARCHAR(70),
+    name VARCHAR,
     location VARCHAR,
     latitude DOUBLE PRECISION,
     longitude DOUBLE PRECISION)
@@ -105,7 +105,7 @@ region 'us-west-2'
 FORMAT AS JSON {}
 COMPUPDATE OFF STATUPDATE OFF
 TIMEFORMAT as 'epochmillisecs'
-BLANKSASNULL EMPTYASNULL;
+TRUNCATECOLUMNS BLANKSASNULL EMPTYASNULL;
 """).format(config.get('S3', 'LOG_DATA'),
             config.get('IAM_ROLE', 'ARN'),
             config.get('S3', 'LOG_JSONPATH'))
@@ -117,7 +117,7 @@ credentials 'aws_iam_role={}'
 region 'us-west-2' 
 FORMAT AS JSON 'auto'
 COMPUPDATE OFF STATUPDATE OFF
-BLANKSASNULL EMPTYASNULL;
+TRUNCATECOLUMNS BLANKSASNULL EMPTYASNULL;
 
 """).format(config.get('S3', 'SONG_DATA'),
             config.get('IAM_ROLE', 'ARN'))
@@ -127,7 +127,6 @@ BLANKSASNULL EMPTYASNULL;
 ## to_timestamp('timestamp','format') in redshift takes string inputs thus need uses to_char()
 songplay_table_insert = ("""
 INSERT INTO songplays (
-songplay_id,
     start_time,
     user_id,
     level,
@@ -136,7 +135,7 @@ songplay_id,
     session_id,
     location,
     user_agent)
-     SELECT DISTINCT to_timestamp(to_char(e.ts, '9999-99-99 99:99:99'),'YYYY-MM-DD HH24:MI:SS')
+     SELECT DISTINCT to_timestamp(to_char(se.ts, '9999-99-99 99:99:99'),'YYYY-MM-DD HH24:MI:SS'),
             se.userId                   AS user_id,
             se.level                    AS level,
             ss.song_id                  AS song_id,
@@ -177,7 +176,7 @@ song_table_insert = ("""
             ss.artist_id                AS artist_id,
             ss.year                     AS year,
             ss.duration                 AS duration
-    FROM staging_songs AS ss;
+    FROM staging_songs AS ss
     WHERE ss.song_id IS NOT NULL;
 """)
 
@@ -196,23 +195,14 @@ artist_table_insert = ("""
     WHERE ss.artist_id IS NOT NULL;
 """)
 
-time_table_insert = ("""
-INSERT INTO time (                  start_time,
-                                        hour,
-                                        day,
-                                        week,
-                                        month,
-                                        year,
-                                        weekday)
-    SELECT DISTINCT ts,
-            EXTRACT(hour FROM start_time)    AS hour,
-            EXTRACT(day FROM start_time)     AS day,
-            EXTRACT(week FROM start_time)    AS week,
-            EXTRACT(month FROM start_time)   AS month,
-            EXTRACT(year FROM start_time)    AS year,
-            EXTRACT(week FROM start_time)    AS weekday
-    FROM    staging_events                   AS se
-    WHERE se.ts IS NOT NULL AND se.page = 'NextSong';
+time_table_insert = ("""INSERT INTO time (start_time, hour, day,
+                     week, month, year, weekday)
+                     SELECT DISTINCT ts, extract(hour from ts), extract(day from ts),
+                     extract(week from ts), extract(month from ts),
+                     extract(year from ts), extract(weekday from ts)
+                     FROM staging_events
+                     WHERE ts IS NOT NULL AND page = 'NextSong';
+                     
 """)
 
 # QUERY LISTS
